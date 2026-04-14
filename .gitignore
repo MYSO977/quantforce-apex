@@ -9,3 +9,4 @@ loras/
 models/
 *.db
 .DS_Store
+*.log
