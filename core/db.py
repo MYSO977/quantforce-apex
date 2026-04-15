@@ -49,8 +49,8 @@ def write_signal(signal) -> bool:
              %(take_profit)s, %(size)s, %(news_score)s, %(rvol)s, %(atr)s,
              %(status)s, %(shadow)s,
              to_timestamp(%(created_at)s), to_timestamp(%(updated_at)s),
-             %(meta)s,
-             %(side)s, %(news_score)s, %(strategy_id)s, 'apex')
+             %(meta)s::jsonb,
+             %(direction)s, %(score)s, 'tech', 'apex')
         ON CONFLICT (signal_id) DO UPDATE SET
             status=EXCLUDED.status,
             updated_at=EXCLUDED.updated_at
@@ -76,6 +76,8 @@ def write_signal(signal) -> bool:
                 "created_at":  signal.created_at,
                 "updated_at":  signal.updated_at,
                 "meta":        json.dumps(signal.meta),
+                "direction":   signal.side.value.lower(),
+                "score":       float(signal.news_score or 0),
             })
         return True
     except Exception as e:
