@@ -49,7 +49,7 @@ def load_recent_bars(symbols: list, limit: int = 30) -> dict:
         with db_cursor(commit=False) as cur:
             cur.execute("""
                 SELECT symbol, extract(epoch from ts) as ts,
-                       open, high, low, close, volume, rvol, vwap, atr
+                       COALESCE(open,price) as open, COALESCE(high,price) as high, COALESCE(low,price) as low, COALESCE(close,price) as close, volume, rvol, COALESCE(vwap,price) as vwap, atr
                 FROM market_events
                 WHERE symbol = ANY(%s)
                   AND ts >= NOW() - INTERVAL '4 hours'

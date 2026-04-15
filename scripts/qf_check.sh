@@ -14,11 +14,11 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 
 # ── PostgreSQL ────────────────────────────────────────────────────
 echo -e "\n[PostgreSQL @ 192.168.0.18]"
-if psql -h 192.168.0.18 -U heng -d quantforce -c "SELECT 1" -q 2>/dev/null | grep -q 1; then
+if PGPASSWORD=newpassword123 psql -h 192.168.0.18 -U heng -d quantforce -c "SELECT 1" -q 2>/dev/null | grep -q 1; then
     ok "Connected to quantforce DB"
     # Check key tables
     for tbl in signals_raw market_events executions universe_whitelist account_state; do
-        COUNT=$(psql -h 192.168.0.18 -U heng -d quantforce -tAc \
+        COUNT=$(PGPASSWORD=newpassword123 psql -h 192.168.0.18 -U heng -d quantforce -tAc \
             "SELECT COUNT(*) FROM $tbl" 2>/dev/null || echo "ERR")
         if [ "$COUNT" = "ERR" ]; then
             fail "Table $tbl — not found"
@@ -88,10 +88,10 @@ fi
 
 # ── Recent signals ────────────────────────────────────────────────
 echo -e "\n[Recent Activity (last 1h)]"
-RECENT=$(psql -h 192.168.0.18 -U heng -d quantforce -tAc \
+RECENT=$(PGPASSWORD=newpassword123 psql -h 192.168.0.18 -U heng -d quantforce -tAc \
     "SELECT COUNT(*) FROM signals_raw WHERE created_at > NOW()-INTERVAL '1 hour'" \
     2>/dev/null || echo "0")
-FILLED=$(psql -h 192.168.0.18 -U heng -d quantforce -tAc \
+FILLED=$(PGPASSWORD=newpassword123 psql -h 192.168.0.18 -U heng -d quantforce -tAc \
     "SELECT COUNT(*) FROM executions WHERE filled_at > NOW()-INTERVAL '24 hours'" \
     2>/dev/null || echo "0")
 ok "Signals last 1h: $RECENT"
@@ -99,7 +99,7 @@ ok "Executions last 24h: $FILLED"
 
 # ── Universe ──────────────────────────────────────────────────────
 echo -e "\n[Universe]"
-UNIV=$(psql -h 192.168.0.18 -U heng -d quantforce -tAc \
+UNIV=$(PGPASSWORD=newpassword123 psql -h 192.168.0.18 -U heng -d quantforce -tAc \
     "SELECT COUNT(*) FROM universe_whitelist WHERE active=true" 2>/dev/null || echo "0")
 ok "Active universe symbols: $UNIV"
 
