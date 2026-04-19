@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.expanduser("~/quantforce-apex"))
 from core.db import db_cursor
 
 util.logToConsole(logging.WARNING)
-logging.basicConfig(level=logging.INFO,
+logging.basicConfig(level=logging.INFO, force=True,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s")
 logger = logging.getLogger("MarketFeed")
 
@@ -65,7 +65,7 @@ class BarAggregator:
 
         # L1 screening
         vwap_dev = abs(c - vwap) / vwap if vwap > 0 else 0
-        passes = (rvol >= RVOL_MIN or vwap_dev >= VWAP_DEV or atr_move >= ATR_MULT)
+        passes = True  # DEBUG
 
         if passes:
             self._write_to_pg(
@@ -139,7 +139,8 @@ if __name__ == "__main__":
                 ORDER BY avg_volume_30d DESC LIMIT 150
             """)
             syms = [r["symbol"] for r in cur.fetchall()]
-    except Exception:
+    except Exception as e:
+        logger.error(f"DB load error: {e}")
         # Fallback: ETF universe always monitored
         syms = ["SPY","QQQ","IWM","XLK","XLV","XLF","XLE","XLI",
                 "XLY","XLP","XLB","XLU","XLRE","XLC"]
