@@ -27,7 +27,7 @@ SSH_NODES = [
 ]
 
 PG_CFG = {
-    "host": "192.168.0.18", "db": "quantforce",
+    "host": "192.168.0.18", "dbname": "quantforce",
     "user": "heng", "password": "newpassword123"
 }
 
