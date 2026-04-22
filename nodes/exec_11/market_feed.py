@@ -65,7 +65,7 @@ class BarAggregator:
 
         # L1 screening
         vwap_dev = abs(c - vwap) / vwap if vwap > 0 else 0
-        passes = True  # DEBUG
+        passes = (rvol >= RVOL_MIN or vwap_dev >= VWAP_DEV or atr_move >= ATR_MULT)
 
         if passes:
             self._write_to_pg(
@@ -151,7 +151,7 @@ if __name__ == "__main__":
             cur.execute("""
                 SELECT symbol FROM universe_whitelist
                 WHERE active=true AND avg_volume_30d >= 500000
-                ORDER BY avg_volume_30d DESC LIMIT 5
+                ORDER BY avg_volume_30d DESC LIMIT 50
             """)
             syms = [r["symbol"] for r in cur.fetchall()]
     except Exception as e:
