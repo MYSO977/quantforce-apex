@@ -69,7 +69,7 @@ def load_recent_bars(symbols):
                        COALESCE(atr,  0)          as atr
                 FROM market_events
                 WHERE symbol = ANY(%s)
-                  AND ts >= NOW() - INTERVAL '4 hours'
+                  AND ts >= NOW() - INTERVAL '5 days'
                 ORDER BY symbol, ts ASC
             """, (symbols,))
             from core.interfaces import Bar
