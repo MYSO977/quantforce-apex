@@ -54,14 +54,19 @@ class IBExecutor:
 
     # ── IB thread ────────────────────────────────────────────────
     def _ib_thread(self):
-        """Runs ib_insync event loop in background thread."""
+        """Runs ib_insync event loop in its own asyncio loop (required for threads)."""
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         while True:
             try:
-                self.ib.connect(IB_HOST, IB_PORT, clientId=CLIENT_ID, timeout=15)
+                loop.run_until_complete(
+                    self.ib.connectAsync(IB_HOST, IB_PORT, clientId=CLIENT_ID, timeout=15)
+                )
                 logger.info(f"IB connected: {IB_HOST}:{IB_PORT} clientId={CLIENT_ID}")
                 logger.info(f"Account: {self.ib.managedAccounts()}")
                 self._ib_ready.set()
-                self.ib.run()          # blocks until disconnect
+                loop.run_until_complete(self.ib.runAsync())   # blocks until disconnect
             except Exception as e:
                 logger.error(f"IB thread error: {e}")
                 self._ib_ready.clear()
