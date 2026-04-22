@@ -1,10 +1,12 @@
 """
-QuantForce Apex — Signal Fusion (Notify-Only Mode)
-Generates signals, sends Telegram alerts for manual execution.
-No IB Gateway dependency.
+QuantForce Apex — Signal Fusion (Notify + Auto-Execute Mode)
+Generates signals, sends Telegram alerts AND pushes APPROVED signals
+via ZMQ to ib_executor on .11 (port 5558).
+shadow=True strategies: Telegram only. shadow=False: Telegram + ZMQ → IB.
 """
-import os, sys, time, logging, yaml
+import os, sys, time, logging, yaml, json
 sys.path.insert(0, os.path.expanduser("~/quantforce-apex"))
+import zmq
 
 from core.interfaces import Signal, SignalStatus
 from core.risk_gate  import RiskGate
@@ -24,7 +26,54 @@ logging.basicConfig(level=logging.INFO,
     datefmt="%H:%M:%S")
 logger = logging.getLogger("SignalFusion")
 
-CFG_PATH = os.path.expanduser("~/quantforce-apex/config")
+CFG_PATH    = os.path.expanduser("~/quantforce-apex/config")
+
+# ── ZMQ push to ib_executor on .11 ───────────────────────────────
+EXECUTOR_HOST = os.getenv("QF_EXECUTOR_HOST", "192.168.0.11")
+EXECUTOR_PORT = int(os.getenv("QF_ZMQ_PORT",  "5558"))
+
+_zmq_ctx    = None
+_zmq_socket = None
+
+def _get_zmq_socket():
+    global _zmq_ctx, _zmq_socket
+    if _zmq_socket is None:
+        _zmq_ctx    = zmq.Context()
+        _zmq_socket = _zmq_ctx.socket(zmq.PUSH)
+        _zmq_socket.setsockopt(zmq.LINGER,    0)
+        _zmq_socket.setsockopt(zmq.SNDHWM,    10)
+        _zmq_socket.connect(f"tcp://{EXECUTOR_HOST}:{EXECUTOR_PORT}")
+        logger.info(f"ZMQ PUSH connected → {EXECUTOR_HOST}:{EXECUTOR_PORT}")
+    return _zmq_socket
+
+
+def push_to_executor(sig) -> bool:
+    """Send APPROVED, non-shadow signal to ib_executor via ZMQ."""
+    payload = {
+        "signal_id":   sig.signal_id,
+        "symbol":      sig.symbol,
+        "side":        sig.side.value,          # "BUY" / "SELL"
+        "product":     sig.product.value,        # "stock" / "etf" / …
+        "entry_price": sig.entry_price,
+        "stop_loss":   sig.stop_loss,
+        "take_profit": sig.take_profit,
+        "size":        sig.size,                 # notional $
+        "confidence":  sig.confidence,
+        "strategy_id": sig.strategy_id,
+        "shadow":      False,
+    }
+    try:
+        sock = _get_zmq_socket()
+        sock.send_json(payload, zmq.NOBLOCK)
+        logger.info(f"[ZMQ→.11] {sig.symbol} {sig.side.value} "
+                    f"size=${sig.size:.0f} conf={sig.confidence:.0%}")
+        return True
+    except zmq.Again:
+        logger.warning(f"[ZMQ] Send buffer full — signal dropped: {sig.symbol}")
+        return False
+    except Exception as e:
+        logger.error(f"[ZMQ] Push failed: {e}")
+        return False
 
 
 def notify_manual_order(sig: Signal):
@@ -212,8 +261,13 @@ def _process(sig, risk_gate, account):
     sig.status = SignalStatus.APPROVED
     write_signal(sig)
     notify_manual_order(sig)
-    logger.info(f"[SIGNAL] {sig.symbol} {sig.side.value} "
-                f"@{sig.entry_price:.2f} → Telegram sent")
+    if sig.shadow:
+        logger.info(f"[SHADOW] {sig.symbol} {sig.side.value} "
+                    f"@{sig.entry_price:.2f} → Telegram only")
+    else:
+        pushed = push_to_executor(sig)
+        logger.info(f"[LIVE] {sig.symbol} {sig.side.value} "
+                    f"@{sig.entry_price:.2f} → Telegram + ZMQ {'✅' if pushed else '❌'}")
 
 
 if __name__ == "__main__":
