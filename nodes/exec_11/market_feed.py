@@ -73,6 +73,33 @@ class BarAggregator:
                 volume=v, rvol=rvol, vwap=vwap, atr=atr, atr_move=atr_move
             )
 
+    def add_hist(self, bar):
+        """Add a BarData bar from reqHistoricalData."""
+        import datetime
+        try:
+            if isinstance(bar.date, str):
+                ts = datetime.datetime.strptime(bar.date, "%Y%m%d %H:%M:%S")
+            else:
+                ts = bar.date
+        except:
+            ts = datetime.datetime.now()
+        o, h, l, c = bar.open, bar.high, bar.low, bar.close
+        v = bar.volume
+        atr = h - l
+        vwap = bar.average if hasattr(bar, 'average') and bar.average > 0 else c
+        self.bars_5s.append((o, h, l, c, v, atr, vwap))
+        if len(self.bars_5s) > 1:
+            self.sma20_closes.append(v)
+            if len(self.sma20_closes) > 20:
+                self.sma20_closes.pop(0)
+            avg_vol = sum(self.sma20_closes) / len(self.sma20_closes)
+            rvol = v / avg_vol if avg_vol > 0 else 1.0
+            atr_move = atr / atr if atr > 0 else 0
+            vwap_dev = abs(c - vwap) / vwap if vwap > 0 else 0
+            self._write_to_pg(ts=ts, o=o, h=h, l=l, c=c,
+                               volume=v, rvol=rvol, vwap=vwap,
+                               atr=atr, atr_move=atr_move)
+
     def _write_to_pg(self, **kw):
         try:
             with db_cursor() as cur:
@@ -96,38 +123,26 @@ def run(symbols: list):
     ib = IB()
     ib.connect(IB_HOST, IB_PORT, clientId=CLIENT_ID)
     logger.info(f"Market feed connected: {len(symbols)} symbols")
-
-    aggregators = {sym: BarAggregator(sym) for sym in symbols}
-
-    def on_bar(bars, has_new):
-        if not has_new:
-            return
-        bar = bars[-1]
-        sym = bar.contract.symbol if hasattr(bar, 'contract') else None
-        # Match to aggregator via subscription
-        for s, agg in aggregators.items():
-            agg.add(bar)
-            break   # ib_insync passes contract-bound bar
-
-    # Subscribe all symbols
     contracts = [Stock(sym, "SMART", "USD") for sym in symbols]
     ib.qualifyContracts(*contracts)
-
-    bar_lists = {}
-    for contract in contracts:
-        bl = ib.reqRealTimeBars(contract, 5, "TRADES", False)
-        sym = contract.symbol
-        # Bind aggregator to this bar list
-        agg = aggregators[sym]
-        bl.updateEvent += lambda bars, has_new, a=agg: (
-            a.add(bars[-1]) if has_new and bars else None
-        )
-        bar_lists[sym] = bl
-        logger.info(f"Subscribed: {sym}")
-
-    logger.info("Market feed running...")
-    ib.run()
-
+    valid = [c for c in contracts if c.conId]
+    logger.info(f"Valid contracts: {len(valid)}")
+    aggregators = {c.symbol: BarAggregator(c.symbol) for c in valid}
+    logger.info("Market feed running (historical poll mode)...")
+    while True:
+        for contract in valid:
+            try:
+                bars = ib.reqHistoricalData(
+                    contract, endDateTime="", durationStr="1 D",
+                    barSizeSetting="1 min", whatToShow="TRADES",
+                    useRTH=True, formatDate=1, keepUpToDate=False)
+                if bars:
+                    agg = aggregators[contract.symbol]
+                    for bar in bars[-3:]:
+                        agg.add_hist(bar)
+            except Exception as e:
+                logger.debug(f"{contract.symbol} hist error: {e}")
+        ib.sleep(60)
 
 if __name__ == "__main__":
     # Load candidate symbols from PG universe
