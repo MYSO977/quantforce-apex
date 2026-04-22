@@ -151,7 +151,7 @@ if __name__ == "__main__":
             cur.execute("""
                 SELECT symbol FROM universe_whitelist
                 WHERE active=true AND avg_volume_30d >= 500000
-                ORDER BY avg_volume_30d DESC LIMIT 150
+                ORDER BY avg_volume_30d DESC LIMIT 5
             """)
             syms = [r["symbol"] for r in cur.fetchall()]
     except Exception as e:
