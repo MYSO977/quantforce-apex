@@ -14,7 +14,7 @@ logger = logging.getLogger("UniverseManager")
 # ── Liquidity filter constants ────────────────────────────────────
 MIN_AVG_VOLUME   = 500_000   # 30-day avg daily volume
 MIN_PRICE        = 3.0
-MAX_PRICE        = 80.0
+MAX_PRICE        = 600.0
 MIN_RVOL_ACTIVE  = 1.5       # To enter daily candidate pool
 MIN_ATR_MOVE     = 1.0       # ATR moves to qualify as active
 
