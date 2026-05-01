@@ -8,7 +8,7 @@ strategies:
   # ── Phase 0/1: Active (paper then live) ──────────────────────
   - id: momentum_swing
     enabled: true
-    shadow: true          # Set to false after 5-day paper validation
+    shadow: false   # LIVE — validated 2026-04-22
     product: stock
     params:
       rvol_min: 2.0

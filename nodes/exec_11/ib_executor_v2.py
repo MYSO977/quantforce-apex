@@ -58,15 +58,14 @@ class IBExecutor:
         import asyncio
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        self.ib = IB()   # fresh IB instance bound to this loop
         while True:
             try:
-                loop.run_until_complete(
-                    self.ib.connectAsync(IB_HOST, IB_PORT, clientId=CLIENT_ID, timeout=15)
-                )
+                self.ib.connect(IB_HOST, IB_PORT, clientId=CLIENT_ID, timeout=15)
                 logger.info(f"IB connected: {IB_HOST}:{IB_PORT} clientId={CLIENT_ID}")
                 logger.info(f"Account: {self.ib.managedAccounts()}")
                 self._ib_ready.set()
-                loop.run_until_complete(self.ib.runAsync())   # blocks until disconnect
+                self.ib.run()   # blocks inside this thread's event loop
             except Exception as e:
                 logger.error(f"IB thread error: {e}")
                 self._ib_ready.clear()
