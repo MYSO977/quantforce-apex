@@ -16,7 +16,7 @@ strategies:
       rr_target: 2.0
       lookback: 20
       min_price: 3.0
-      max_price: 80.0
+      max_price: 20.0
 
   - id: news_breakout
     enabled: true
